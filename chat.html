@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#313338] text-gray-200 antialiased selection:bg-[#5865f2] selection:text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>PP12 Chat</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter', 'sans-serif'] },
+      colors: { pp12: { brand: '#5865f2', brandHover: '#4752c4', green: '#23a55a', red: '#f23f43',
+        bgPrimary: '#313338', bgSecondary: '#2b2d31', bgTertiary: '#1e1f22', chatInput: '#383a40' } }
+    } } }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #2b2d31; }
+    ::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 4px; }
+    emoji-picker {
+      --background:#2b2d31; --border-color:#1e1f22; --input-border-color:#1e1f22; --input-font-color:#e5e7eb;
+      --input-placeholder-color:#6b7280; --indicator-color:#5865f2; --outline-color:#5865f2;
+      --button-hover-background:#383a40; --button-active-background:#404249; --category-font-color:#9ca3af;
+      --num-columns:8; --emoji-size:1.4rem; width:min(360px,calc(100vw - 3rem)); height:min(380px,55dvh);
+    }
+    #appContent { transition: filter .12s ease; }
+    #appContent.pp12-blurred { filter: blur(18px) brightness(.5); }
+  </style>
+</head>
+
+<body class="h-[100dvh] w-full overflow-hidden flex flex-col font-sans text-sm bg-pp12-bgPrimary">
+
+  <!-- SIGN IN -->
+  <div id="authView" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#313338]">
+    <div class="bg-[#2b2d31] p-8 rounded-lg shadow-2xl w-full max-w-md mx-4 border border-gray-800 text-center">
+      <h1 class="text-2xl font-bold text-white mb-2">Welcome to PP12 Chat</h1>
+      <p class="text-gray-400 text-sm mb-6">Private messages with people you approve.</p>
+      <div id="authError" class="hidden mb-4 p-3 bg-red-500/20 border border-red-500 rounded text-red-400 text-xs"></div>
+      <button id="googleBtn" class="w-full py-3 rounded bg-white hover:bg-gray-200 text-gray-900 font-bold transition flex items-center justify-center gap-3 shadow-lg">
+        <i class="fa-brands fa-google text-lg"></i> Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="appRoot" class="flex-1 flex overflow-hidden relative hidden">
+    <div id="blurBadge" class="hidden absolute inset-0 z-50 flex-col items-center justify-center gap-2 bg-pp12-bgPrimary/70">
+      <i class="fa-solid fa-eye-slash text-3xl text-gray-300"></i>
+      <span class="text-gray-300 text-sm font-semibold px-6 text-center">Hidden while this tab isn't active</span>
+    </div>
+    <div id="appContent" class="flex-1 flex overflow-hidden min-w-0">
+
+      <!-- SIDEBAR -->
+      <aside id="sidebar" class="md:flex flex-col w-full md:w-72 bg-pp12-bgSecondary border-r border-black/10 shrink-0 min-h-0">
+        <div class="h-14 px-4 flex items-center justify-between border-b border-black/20 shrink-0">
+          <h1 class="font-bold text-white text-lg">PP12 Chat</h1>
+          <button id="newDmBtn" class="text-xs font-semibold px-3 py-1.5 rounded bg-pp12-brand hover:bg-pp12-brandHover text-white"><i class="fa-solid fa-user-plus mr-1"></i>New DM</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3">
+          <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Rooms</div>
+          <div id="roomList" class="mb-4"></div>
+          <div id="requestsSection" class="hidden mb-4">
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Requests <span id="reqCount" class="hidden ml-1 px-1.5 rounded-full bg-pp12-red text-white text-[10px]"></span></div>
+            <div id="requestList"></div>
+          </div>
+          <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Direct messages</div>
+          <div id="dmList"></div>
+        </div>
+        <div class="p-3 border-t border-black/20 flex items-center gap-3 bg-pp12-bgTertiary shrink-0">
+          <img id="userAvatar" src="" referrerpolicy="no-referrer" class="w-9 h-9 rounded-full bg-gray-700" alt="" />
+          <div class="flex-1 min-w-0">
+            <div id="myRoleTag" class="hidden text-[10px] font-bold uppercase tracking-wide"></div>
+            <div id="userDisplayName" class="font-bold text-sm text-white truncate">User</div>
+            <div class="text-xs text-pp12-green font-semibold">Online</div>
+          </div>
+          <button id="logoutBtn" title="Log out" aria-label="Log out" class="text-gray-400 hover:text-red-400 text-lg"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+      </aside>
+
+      <!-- CHAT -->
+      <main id="chatCol" class="hidden md:flex flex-1 flex-col min-w-0 bg-pp12-bgPrimary">
+        <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center px-6">
+          <i class="fa-regular fa-comments text-5xl text-gray-600 mb-4"></i>
+          <p class="text-gray-300 font-semibold mb-1">No conversation open</p>
+          <p class="text-gray-500 text-sm mb-4">Pick the Main Room or a DM, or request one with someone new.</p>
+          <button id="emptyNewDmBtn" class="px-4 py-2 rounded bg-pp12-brand hover:bg-pp12-brandHover text-white font-semibold">Request a DM</button>
+        </div>
+
+        <div id="chatPane" class="hidden flex-1 flex flex-col min-h-0">
+          <div class="h-14 border-b border-black/20 px-4 flex items-center gap-3 shrink-0 shadow-sm">
+            <button id="backBtn" aria-label="Back" class="md:hidden text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-arrow-left"></i></button>
+            <img id="peerAvatar" src="" referrerpolicy="no-referrer" class="w-8 h-8 rounded-full bg-gray-700" alt="" />
+            <span id="roomIcon" class="hidden w-8 h-8 rounded-full bg-pp12-brand/20 text-pp12-brand items-center justify-center"><i class="fa-solid fa-hashtag"></i></span>
+            <h3 id="peerName" class="font-bold text-white text-lg truncate"></h3>
+            <button id="manageBtn" type="button" title="Manage room" aria-label="Manage room" class="hidden ml-auto shrink-0 text-gray-400 hover:text-white transition text-sm font-semibold flex items-center gap-1.5"><i class="fa-solid fa-shield-halved"></i><span class="hidden sm:inline">Manage</span></button>
+          </div>
+          <div id="lockBanner" class="hidden mx-4 mt-3 p-2 rounded bg-yellow-500/10 border border-yellow-600/40 text-yellow-400 text-xs text-center shrink-0">🔒 This room is locked. Only staff can send messages.</div>
+          <div id="notice" class="hidden mx-4 mt-3 p-3 rounded bg-red-500/20 border border-red-500 text-red-300 text-xs shrink-0 flex items-center justify-between gap-3">
+            <span id="noticeText"></span>
+            <button type="button" id="noticeRetryBtn" class="shrink-0 underline hover:text-red-100 font-semibold">Retry</button>
+          </div>
+          <div id="chatMessageArea" class="flex-1 overflow-y-auto px-4 md:px-6 py-4 flex flex-col"></div>
+          <div id="uploadTray" class="hidden px-4 md:px-6 pb-2 flex-col gap-2 shrink-0"></div>
+          <div class="px-4 md:px-6 pb-6 pt-2 shrink-0">
+            <form id="messageForm" class="relative bg-pp12-chatInput rounded-xl px-4 py-3 flex items-center gap-4 shadow-inner">
+              <div id="emojiPop" class="hidden absolute bottom-full right-0 mb-2 z-30 shadow-2xl rounded-lg overflow-hidden"></div>
+              <input id="fileInput" type="file" multiple class="hidden" />
+              <button type="button" id="attachBtn" title="Upload a file (max 100 MB)" aria-label="Upload a file" class="text-gray-400 hover:text-pp12-brand transition text-xl"><i class="fa-solid fa-paperclip"></i></button>
+              <input id="chatInput" type="text" maxlength="2000" autocomplete="off" placeholder="Send a message" class="flex-1 min-w-0 bg-transparent text-gray-100 placeholder-gray-500 text-base outline-none" />
+              <button type="button" id="emojiBtn" aria-label="Add emoji" class="text-gray-400 hover:text-yellow-400 transition text-xl"><i class="fa-solid fa-face-smile"></i></button>
+              <button type="submit" aria-label="Send message" class="text-gray-400 hover:text-white transition text-xl"><i class="fa-solid fa-paper-plane"></i></button>
+            </form>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- NEW DM MODAL -->
+  <div id="dmModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+    <div class="bg-[#2b2d31] rounded-lg shadow-2xl w-full max-w-md border border-gray-800 max-h-[80vh] flex flex-col">
+      <div class="p-4 border-b border-black/20 flex items-center justify-between shrink-0">
+        <h2 class="text-lg font-bold text-white">Request a DM</h2>
+        <button id="dmModalClose" type="button" aria-label="Close" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div class="p-4 shrink-0">
+        <input id="userSearch" type="text" autocomplete="off" placeholder="Search by the start of their name" class="w-full bg-pp12-bgTertiary border border-black/30 rounded px-3 py-2 text-gray-100 outline-none focus:border-pp12-brand" />
+      </div>
+      <div id="userResults" class="flex-1 overflow-y-auto px-4 pb-4"></div>
+    </div>
+  </div>
+
+  <!-- BANNED -->
+  <div id="bannedView" class="hidden fixed inset-0 z-[130] flex items-center justify-center bg-pp12-bgPrimary p-4">
+    <div class="bg-[#2b2d31] p-8 rounded-lg shadow-2xl w-full max-w-md border border-gray-800 text-center">
+      <i class="fa-solid fa-ban text-4xl text-pp12-red mb-4"></i>
+      <h2 class="text-xl font-bold text-white mb-2">You've been blacklisted</h2>
+      <p class="text-gray-400 text-sm mb-6">An admin blocked your access. If you think that's a mistake, reach out to them directly.</p>
+      <button id="bannedSignOutBtn" class="py-2 px-5 rounded bg-pp12-chatInput hover:bg-pp12-bgTertiary text-white font-semibold transition">Sign out</button>
+    </div>
+  </div>
+
+  <!-- MANAGE ROOM (staff) -->
+  <div id="manageView" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+    <div class="bg-[#2b2d31] rounded-lg shadow-2xl w-full max-w-lg border border-gray-800 max-h-[85vh] flex flex-col">
+      <div class="p-5 border-b border-black/20 flex items-center justify-between shrink-0">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-shield-halved text-pp12-brand"></i>Manage Main Room</h2>
+        <button id="manageCloseBtn" type="button" aria-label="Close" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div id="adminControls" class="hidden p-4 border-b border-black/20 flex items-center justify-between gap-3 shrink-0">
+        <div><div class="text-sm font-semibold text-white">Lock room</div><div class="text-xs text-gray-400">Only staff can send messages while locked.</div></div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input type="checkbox" id="lockToggle" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-pp12-brand transition"></div>
+          <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+        </label>
+      </div>
+      <div class="p-3 border-b border-black/20 flex flex-wrap gap-2 shrink-0">
+        <button type="button" id="muteSelectedBtn" class="text-xs px-3 py-1.5 rounded bg-pp12-chatInput hover:bg-pp12-bgTertiary text-gray-200 font-semibold">Mute selected</button>
+        <button type="button" id="unmuteSelectedBtn" class="text-xs px-3 py-1.5 rounded bg-pp12-chatInput hover:bg-pp12-bgTertiary text-gray-200 font-semibold">Unmute selected</button>
+        <button type="button" id="banSelectedBtn" class="hidden text-xs px-3 py-1.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold">Blacklist selected</button>
+        <button type="button" id="clearChatBtn" class="hidden text-xs px-3 py-1.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold ml-auto">Clear all messages</button>
+      </div>
+      <p class="text-[11px] text-gray-500 px-4 pt-3">People show up below once they've sent a message in the Main Room. Tick a box to include someone in the "selected" actions.</p>
+      <div id="roster" class="flex-1 overflow-y-auto p-3"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, collection, query, where, orderBy, limit, limitToLast, onSnapshot, getDocs, getDoc, Bytes, addDoc, setDoc, updateDoc, deleteDoc, doc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyDhuwUC7BJjwPi65lqcdgseinp2v8Ykxq0",
+      authDomain: "byguvgf.firebaseapp.com",
+      projectId: "byguvgf",
+      storageBucket: "byguvgf.firebasestorage.app",
+      messagingSenderId: "330585528658",
+      appId: "1:330585528658:web:2288b851d012353190c28b",
+      measurementId: "G-YKBBN198W1"
+    });
+    const auth = getAuth(app), db = getFirestore(app);
+    const USERS = collection(db, 'users'), REQUESTS = collection(db, 'dm_requests'), DMS = collection(db, 'dms');
+    const ROOM = 'room', MESSAGES = collection(db, 'global_chat');
+    const msgCol = id => id === ROOM ? MESSAGES : collection(db, 'dms', id, 'messages');
+    const MAX_FILE_BYTES = 100 * 1024 * 1024, CHUNK = 900 * 1024; // files are stored in Firestore in ~900 KB pieces
+
+    const $ = id => document.getElementById(id);
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const pairIdOf = (a, b) => [a, b].sort().join('_');
+    const fallbackAvatar = seed => `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
+    const safeAvatar = (url, seed) => (typeof url === 'string' && /^https:\/\//.test(url) && url.length <= 500) ? url : fallbackAvatar(seed || 'x');
+    const ms = t => (t && t.toMillis) ? t.toMillis() : Date.now();
+    const fmt = t => (t.toDateString() === new Date().toDateString() ? '' : t.toLocaleDateString() + ' ') + t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formatBytes = n => { if (n < 1024) return n + ' B'; const u = ['KB', 'MB', 'GB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 2); return n.toFixed(n >= 10 ? 0 : 1) + ' ' + u[i]; };
+    const INLINE_IMG = /^image\/(png|jpe?g|gif|webp|avif|bmp)$/, INLINE_VID = /^video\/(mp4|webm|ogg|quicktime)$/, INLINE_AUD = /^audio\//;
+    const isInline = t => INLINE_IMG.test(t) || INLINE_VID.test(t) || INLINE_AUD.test(t);
+    const fileIcon = (t, n) => /^image\//.test(t) ? 'fa-file-image' : /^video\//.test(t) ? 'fa-file-video' : /^audio\//.test(t) ? 'fa-file-audio'
+      : /pdf/.test(t) ? 'fa-file-pdf' : (/zip|compressed|tar|rar|7z/.test(t) || /\.(zip|rar|7z|tar|gz)$/i.test(n)) ? 'fa-file-zipper' : /^text\//.test(t) ? 'fa-file-lines' : 'fa-file';
+
+    let me = null, incoming = [], outgoing = [], dms = [];
+    let activeId = null, lastSnap = null, forceScroll = false;
+    let unsubIn, unsubOut, unsubDms, unsubMsgs;
+    const uploadTasks = new Set();
+
+    // ---- notices -------------------------------------------------------
+    const dbHint = e => e.code === 'permission-denied'
+      ? 'Firebase blocked this request. Publish the latest Firestore rules, wait a minute, then press Retry or refresh the page.'
+      : e.code === 'unavailable' ? 'Cannot reach Firebase. Check your connection.' : (e.code || e.message);
+    let noticeSrc = '';
+    const notice = (msg, src = '') => { $('noticeText').textContent = msg || ''; $('notice').classList.toggle('hidden', !msg); noticeSrc = msg ? src : ''; };
+    let watchdog = null;
+    const watch = snap => {
+      if (!(snap.metadata.fromCache || snap.metadata.hasPendingWrites)) { clearTimeout(watchdog); watchdog = null; if (noticeSrc === 'watch') notice(''); return; }
+      if (!watchdog) watchdog = setTimeout(() => { watchdog = null; notice('Messages are not reaching the database yet. Check that Firestore is created and the rules are published.', 'watch'); }, 8000);
+    };
+
+    // ---- blur when tab isn't focused -----------------------------------
+    function setBlurred(on) { $('appContent').classList.toggle('pp12-blurred', on); $('blurBadge').classList.toggle('hidden', !on); $('blurBadge').classList.toggle('flex', on); }
+    function checkFocus() { if (!$('appRoot').classList.contains('hidden')) setBlurred(document.hidden || !document.hasFocus()); }
+    document.addEventListener('visibilitychange', checkFocus);
+    window.addEventListener('blur', checkFocus);
+    window.addEventListener('focus', checkFocus);
+
+    // ---- listeners -----------------------------------------------------
+    const mapDocs = snap => snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
+    const onErr = e => { console.error(e); notice(dbHint(e), 'err'); };
+    const errAt = name => e => { console.error(name, e); notice(dbHint(e) + ' [' + name + ']', 'err'); };
+    function startListeners() {
+      startModeration();
+      unsubIn = onSnapshot(query(REQUESTS, where('to', '==', me.id)), s => { incoming = mapDocs(s); renderSidebar(); }, errAt('dm_requests (incoming)'));
+      unsubOut = onSnapshot(query(REQUESTS, where('from', '==', me.id)), s => { outgoing = mapDocs(s); renderSidebar(); }, errAt('dm_requests (sent)'));
+      unsubDms = onSnapshot(query(DMS, where('members', 'array-contains', me.id)), s => {
+        dms = mapDocs(s);
+        if (activeId && activeId !== ROOM && !dms.some(d => d.id === activeId) && !s.metadata.hasPendingWrites && !s.metadata.fromCache) closeConversation();
+        updateChatHeader(); renderSidebar();
+      }, errAt('dms'));
+    }
+    function stopListeners() {
+      stopModeration();
+      [unsubIn, unsubOut, unsubDms, unsubMsgs].forEach(u => u && u());
+      unsubIn = unsubOut = unsubDms = unsubMsgs = null;
+      clearTimeout(watchdog); watchdog = null;
+    }
+
+    // ---- sidebar -------------------------------------------------------
+    const other = dm => { const uid = dm.members.find(u => u !== me.id); return { uid, ...((dm.people || {})[uid] || { name: 'User' }) }; };
+    function iconBtn(cls, icon, label, fn) {
+      const b = el('button', cls); b.type = 'button'; b.title = label; b.setAttribute('aria-label', label);
+      b.innerHTML = `<i class="fa-solid ${icon}"></i>`; b.addEventListener('click', e => { e.stopPropagation(); fn(); }); return b;
+    }
+    function avatarImg(url, seed, cls) { const i = el('img', cls); i.src = safeAvatar(url, seed); i.alt = ''; i.referrerPolicy = 'no-referrer'; return i; }
+    function requestRow(r, dir) {
+      const uid = dir === 'in' ? r.from : r.to;
+      const row = el('div', 'flex items-center gap-2 p-2 rounded-lg bg-pp12-bgTertiary/60 mb-1.5');
+      const txt = el('div', 'flex-1 min-w-0');
+      txt.append(el('div', 'text-sm font-semibold text-white truncate', String((dir === 'in' ? r.fromName : r.toName) || 'User').slice(0, 60)),
+        el('div', 'text-[11px] text-gray-400', dir === 'in' ? 'wants to message you' : 'request sent'));
+      row.append(avatarImg(dir === 'in' ? r.fromAvatar : r.toAvatar, uid, 'w-8 h-8 rounded-full bg-gray-700 shrink-0'), txt);
+      if (dir === 'in') {
+        row.append(iconBtn('w-7 h-7 rounded bg-pp12-green/20 hover:bg-pp12-green/40 text-pp12-green', 'fa-check', 'Accept', () => acceptRequest(r)),
+                   iconBtn('w-7 h-7 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300', 'fa-xmark', 'Decline', () => removeRequest(r)));
+      } else row.append(iconBtn('w-7 h-7 rounded bg-pp12-chatInput hover:bg-pp12-bgTertiary text-gray-300', 'fa-xmark', 'Cancel request', () => removeRequest(r)));
+      return row;
+    }
+    function renderSidebar() {
+      if (!me) return;
+      const byNew = (a, b) => ms(b.createdAt) - ms(a.createdAt);
+      const pin = incoming.filter(r => r.status === 'pending').sort(byNew), pout = outgoing.filter(r => r.status === 'pending').sort(byNew);
+      const rl = $('requestList'); rl.replaceChildren();
+      pin.forEach(r => rl.append(requestRow(r, 'in'))); pout.forEach(r => rl.append(requestRow(r, 'out')));
+      $('requestsSection').classList.toggle('hidden', !pin.length && !pout.length);
+      $('reqCount').textContent = pin.length; $('reqCount').classList.toggle('hidden', !pin.length);
+
+      const rr = $('roomList'); rr.replaceChildren();
+      const room = el('button', 'w-full flex items-center gap-3 p-2 rounded-lg text-left transition ' + (activeId === ROOM ? 'bg-pp12-chatInput' : 'hover:bg-black/20'));
+      room.type = 'button';
+      const ri = el('div', 'w-9 h-9 rounded-full bg-pp12-brand/20 text-pp12-brand flex items-center justify-center shrink-0'); ri.innerHTML = '<i class="fa-solid fa-hashtag"></i>';
+      const rt = el('div', 'flex-1 min-w-0'); rt.append(el('div', 'text-sm font-semibold text-white', 'Main Room'), el('div', 'text-xs text-gray-500', 'Everyone'));
+      room.append(ri, rt); room.addEventListener('click', () => openConversation(ROOM)); rr.append(room);
+
+      const list = $('dmList'); list.replaceChildren();
+      if (!dms.length) list.append(el('p', 'text-xs text-gray-500 italic px-2 py-3', 'No conversations yet. Use New DM to request one.'));
+      for (const dm of [...dms].sort((a, b) => ms(b.lastAt) - ms(a.lastAt))) {
+        const o = other(dm);
+        const row = el('button', 'w-full flex items-center gap-3 p-2 rounded-lg text-left transition ' + (dm.id === activeId ? 'bg-pp12-chatInput' : 'hover:bg-black/20'));
+        row.type = 'button';
+        const txt = el('div', 'flex-1 min-w-0');
+        txt.append(el('div', 'text-sm font-semibold text-white truncate', String(o.name).slice(0, 60)), el('div', 'text-xs text-gray-500 truncate', dm.lastPreview || ' '));
+        row.append(avatarImg(o.avatar, o.uid, 'w-9 h-9 rounded-full bg-gray-700 shrink-0'), txt);
+        row.addEventListener('click', () => openConversation(dm.id));
+        list.append(row);
+      }
+      if (!$('dmModal').classList.contains('hidden')) renderUserResults(lastResults);
+    }
+
+    // ---- requests ------------------------------------------------------
+    async function sendRequest(u) {
+      try {
+        await setDoc(doc(db, 'dm_requests', me.id + '_' + u.id), {
+          from: me.id, to: u.id, fromName: me.name, fromAvatar: me.avatar, toName: u.name, toAvatar: u.avatar || '',
+          status: 'pending', createdAt: serverTimestamp()
+        });
+      } catch (e) { notice(dbHint(e), 'err'); }
+    }
+    async function acceptRequest(r) {
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'dm_requests', r.id), { status: 'accepted' });
+        batch.set(doc(db, 'dms', pairIdOf(r.from, me.id)), {
+          members: [r.from, me.id],
+          people: { [r.from]: { name: r.fromName, avatar: r.fromAvatar || '' }, [me.id]: { name: me.name, avatar: me.avatar } },
+          createdAt: serverTimestamp(), lastAt: serverTimestamp(), lastPreview: ''
+        });
+        await batch.commit();
+        openConversation(pairIdOf(r.from, me.id));
+      } catch (e) { notice(dbHint(e), 'err'); }
+    }
+    const removeRequest = r => deleteDoc(doc(db, 'dm_requests', r.id)).catch(e => notice(dbHint(e), 'err'));
+
+    // ---- new DM modal --------------------------------------------------
+    let lastResults = null, searchTimer = null, searchReq = 0;
+    const relationTo = uid => dms.some(d => d.id === pairIdOf(me.id, uid)) ? 'connected'
+      : outgoing.some(r => r.to === uid && r.status === 'pending') ? 'sent'
+      : incoming.some(r => r.from === uid && r.status === 'pending') ? 'incoming' : 'none';
+    function renderUserResults(res) {
+      const box = $('userResults'); box.replaceChildren(); lastResults = res;
+      if (!res) return box.append(el('p', 'text-xs text-gray-500 text-center py-6', 'Type at least 2 letters of their name.'));
+      if (res.error) return box.append(el('p', 'text-xs text-red-400 text-center py-6', res.error));
+      if (!res.users.length) return box.append(el('p', 'text-xs text-gray-500 text-center py-6', 'No one found. They need to have signed in to PP12 Chat at least once.'));
+      for (const u of res.users) {
+        const rel = relationTo(u.id);
+        const row = el('div', 'flex items-center gap-3 p-2 rounded hover:bg-black/10');
+        row.append(avatarImg(u.avatar, u.id, 'w-9 h-9 rounded-full bg-gray-700 shrink-0'), el('div', 'flex-1 min-w-0 text-sm font-semibold text-white truncate', String(u.name).slice(0, 60)));
+        const b = el('button', 'text-xs px-3 py-1.5 rounded font-semibold shrink-0 ' + (rel === 'sent' ? 'bg-pp12-chatInput text-gray-400 cursor-default' : 'bg-pp12-brand hover:bg-pp12-brandHover text-white'),
+          { none: 'Request DM', sent: 'Requested', incoming: 'Accept', connected: 'Message' }[rel]);
+        b.type = 'button'; b.disabled = rel === 'sent';
+        b.addEventListener('click', () => {
+          if (rel === 'none') sendRequest(u);
+          else if (rel === 'incoming') acceptRequest(incoming.find(r => r.from === u.id));
+          else if (rel === 'connected') { closeDmModal(); openConversation(pairIdOf(me.id, u.id)); }
+        });
+        row.append(b); box.append(row);
+      }
+    }
+    async function runUserSearch() {
+      const q = $('userSearch').value.trim().toLowerCase(), myReq = ++searchReq;
+      if (q.length < 2) return renderUserResults(null);
+      try {
+        const snap = await getDocs(query(USERS, where('nameLower', '>=', q), where('nameLower', '<=', q + '\uf8ff'), limit(20)));
+        if (myReq === searchReq) renderUserResults({ users: snap.docs.filter(d => d.id !== me.id).map(d => ({ id: d.id, ...d.data() })) });
+      } catch (e) { if (myReq === searchReq) renderUserResults({ users: [], error: dbHint(e) }); }
+    }
+    function openDmModal() { $('dmModal').classList.remove('hidden'); $('userSearch').value = ''; renderUserResults(null); $('userSearch').focus(); }
+    function closeDmModal() { $('dmModal').classList.add('hidden'); }
+    $('newDmBtn').addEventListener('click', openDmModal);
+    $('emptyNewDmBtn').addEventListener('click', openDmModal);
+    $('dmModalClose').addEventListener('click', closeDmModal);
+    $('dmModal').addEventListener('click', e => { if (e.target === $('dmModal')) closeDmModal(); });
+    $('userSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runUserSearch, 300); });
+
+    // ---- conversations -------------------------------------------------
+    function updateLayout() {
+      const on = !!activeId;
+      $('sidebar').classList.toggle('hidden', on); $('sidebar').classList.toggle('flex', !on);
+      $('chatCol').classList.toggle('flex', on); $('chatCol').classList.toggle('hidden', !on);
+      $('emptyState').classList.toggle('hidden', on); $('chatPane').classList.toggle('hidden', !on);
+    }
+    function updateChatHeader() {
+      if (activeId === ROOM) {
+        $('peerName').textContent = 'Main Room'; $('peerAvatar').classList.add('hidden'); $('roomIcon').classList.remove('hidden');
+        syncRoomUI(); return;
+      }
+      $('peerAvatar').classList.remove('hidden'); $('roomIcon').classList.add('hidden'); syncRoomUI();
+      const dm = dms.find(d => d.id === activeId);
+      if (!dm) return;
+      const o = other(dm);
+      $('peerName').textContent = String(o.name).slice(0, 60);
+      $('peerAvatar').src = safeAvatar(o.avatar, o.uid);
+      $('chatInput').placeholder = 'Message ' + String(o.name).slice(0, 60);
+    }
+    function openConversation(id) {
+      if (unsubMsgs) unsubMsgs();
+      activeId = id; lastSnap = null; forceScroll = true; notice('');
+      $('chatMessageArea').replaceChildren();
+      updateLayout(); updateChatHeader(); renderSidebar();
+      unsubMsgs = onSnapshot(query(msgCol(id), orderBy('createdAt', 'asc'), limitToLast(200)), { includeMetadataChanges: true },
+        snap => { lastSnap = snap; render(snap); }, errAt(id === ROOM ? 'global_chat' : 'dm messages'));
+      if (window.innerWidth >= 768) $('chatInput').focus();
+    }
+    function closeConversation() {
+      if (unsubMsgs) unsubMsgs(); unsubMsgs = null;
+      activeId = null; lastSnap = null; updateLayout(); renderSidebar(); syncRoomUI();
+    }
+    $('backBtn').addEventListener('click', closeConversation);
+
+    // ---- rendering messages -------------------------------------------
+    const fileCache = new Map(), inflight = new Map();   // file id -> { blob, url }
+    const chunkId = i => String(i).padStart(5, '0');
+    async function loadFile(f, onProgress) {
+      const parts = new Array(f.chunks); let next = 0, got = 0;
+      const worker = async () => {
+        while (next < f.chunks) {
+          const i = next++, snap = await getDoc(doc(db, 'files', f.id, 'chunks', chunkId(i)));
+          if (!snap.exists()) throw new Error('Part of this file is missing. It may have been deleted.');
+          parts[i] = snap.data().data.toUint8Array(); onProgress(++got / f.chunks);
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+      const blob = new Blob(parts, { type: isInline(f.type) ? f.type : 'application/octet-stream' });
+      const entry = { blob, url: URL.createObjectURL(blob) }; fileCache.set(f.id, entry); return entry;
+    }
+    function fetchFile(f, onProgress) {
+      if (fileCache.has(f.id)) return Promise.resolve(fileCache.get(f.id));
+      if (!inflight.has(f.id)) inflight.set(f.id, loadFile(f, onProgress).finally(() => inflight.delete(f.id)));
+      return inflight.get(f.id);
+    }
+    async function deleteFileData(f) {
+      if (!/^[A-Za-z0-9]{20}$/.test(String(f.id)) || !Number.isInteger(f.chunks)) return;
+      for (let s = 0; s < f.chunks; s += 100) {
+        const b = writeBatch(db);
+        for (let i = s; i < Math.min(f.chunks, s + 100); i++) b.delete(doc(db, 'files', f.id, 'chunks', chunkId(i)));
+        await b.commit();
+      }
+      await deleteDoc(doc(db, 'files', f.id));
+      const c = fileCache.get(f.id); if (c) { URL.revokeObjectURL(c.url); fileCache.delete(f.id); }
+    }
+    function fileBody(f0) {
+      const f = { id: String(f0.id), chunks: f0.chunks, type: String(f0.type || ''), name: String(f0.name || 'file').slice(0, 200), size: Number(f0.size) || 0 };
+      if (!/^[A-Za-z0-9]{20}$/.test(f.id) || !Number.isInteger(f.chunks) || f.chunks < 1 || f.chunks > 120) return el('div', 'text-gray-500 italic text-[15px]', '[file unavailable]');
+      const wrap = el('div', 'mt-1'), card = el('div', 'flex items-center gap-3 p-3 rounded-lg bg-pp12-bgSecondary border border-black/20 max-w-sm');
+      const info = el('div', 'flex-1 min-w-0'), status = el('div', 'text-xs text-gray-400', formatBytes(f.size));
+      info.append(el('div', 'text-sm font-semibold text-white truncate', f.name), status);
+      const btn = el('button', 'shrink-0 text-xs px-3 py-1.5 rounded font-semibold bg-pp12-brand hover:bg-pp12-brandHover text-white', isInline(f.type) ? 'Load' : 'Download');
+      btn.type = 'button';
+      card.append(el('i', 'fa-solid ' + fileIcon(f.type, f.name) + ' text-2xl text-gray-400'), info, btn); wrap.append(card);
+      const show = entry => {
+        let node = null;
+        if (INLINE_IMG.test(f.type)) { node = el('img', 'rounded-lg max-w-[320px] max-h-[320px] w-auto h-auto'); node.alt = f.name; }
+        else if (INLINE_VID.test(f.type)) { node = el('video', 'rounded-lg max-w-[360px] max-h-[300px]'); node.controls = true; }
+        else if (INLINE_AUD.test(f.type)) { node = el('audio', 'max-w-full'); node.controls = true; }
+        const a = el('a'); a.href = entry.url; a.download = f.name;
+        if (node) {
+          node.src = entry.url; a.className = 'block text-xs text-pp12-brand hover:underline mt-1'; a.textContent = 'Save ' + f.name + ' (' + formatBytes(f.size) + ')';
+          card.replaceWith(node); wrap.append(a);
+        } else { document.body.append(a); a.click(); a.remove(); status.textContent = formatBytes(f.size); }
+      };
+      const go = async () => {
+        btn.disabled = true; btn.classList.add('opacity-60');
+        try { show(await fetchFile(f, p => { status.textContent = Math.round(p * 100) + '%'; })); }
+        catch (e) { status.textContent = e.code === 'permission-denied' ? 'Blocked. Publish the latest Firestore rules.' : (e.message || 'Download failed'); btn.disabled = false; btn.classList.remove('opacity-60'); }
+        btn.disabled = false; btn.classList.remove('opacity-60');
+      };
+      btn.addEventListener('click', go);
+      if (isInline(f.type) && (fileCache.has(f.id) || (INLINE_IMG.test(f.type) && f.chunks <= 2))) go();   // cached media and small images show automatically
+      return wrap;
+    }
+    function render(snap) {
+      watch(snap);
+      const box = $('chatMessageArea');
+      const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+      box.replaceChildren();
+      if (snap.empty) { box.append(el('div', 'text-center text-gray-500 mt-10', 'No messages yet. Say hi 👋')); return; }
+      let prev = null;
+      for (const d of snap.docs) {
+        const m = d.data({ serverTimestamps: 'estimate' });
+        if (!(m.kind === 'file' && m.file) && typeof m.text !== 'string') continue; // old encrypted/GIF messages
+        if (activeId === ROOM && m.authorId) recentAuthors.set(m.authorId, { name: String(m.authorName || 'User').slice(0, 60), avatar: m.avatar });
+        const t = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate() : new Date();
+        const grouped = prev && prev.a === m.authorId && t - prev.t < 5 * 60000;
+        const mine = m.authorId === me.id, meta = activeId === ROOM ? ROLE_META[rolesMap.get(m.authorId)] : null, canDel = mine || (activeId === ROOM && amStaff());
+        const row = el('div', 'group relative flex gap-4 px-2 py-0.5 -mx-2 rounded hover:bg-black/10 transition ' + (grouped ? '' : 'mt-4 ') + (d.metadata.hasPendingWrites ? 'opacity-50' : ''));
+        const body = el('div', 'flex-1 min-w-0');
+        if (grouped) {
+          const g = el('div', 'w-10 shrink-0 text-right');
+          g.append(el('span', 'hidden group-hover:inline text-[10px] text-gray-500 leading-6', t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+          row.append(g);
+        } else {
+          row.append(avatarImg(m.avatar, m.authorId, 'w-10 h-10 rounded-full bg-gray-700 shrink-0 shadow-sm mt-0.5'));
+          const head = el('div', 'flex items-baseline gap-2');
+          head.append(el('span', 'font-bold text-base ' + (meta ? meta.cls : 'text-white'), String(m.authorName || 'User').slice(0, 60)));
+          if (meta) head.append(el('span', 'text-[10px] font-bold uppercase ' + meta.cls, meta.label));
+          head.append(el('span', 'text-xs text-gray-400', fmt(t)));
+          body.append(head);
+        }
+        if (m.kind === 'file' && m.file) body.append(fileBody(m.file));
+        else body.append(el('div', 'text-gray-200 text-[15px] break-words whitespace-pre-wrap leading-relaxed select-text', String(m.text || '')));
+        row.append(body);
+        if (canDel) {
+          row.append(iconBtn('hidden group-hover:block text-gray-500 hover:text-red-400 p-2', 'fa-trash', 'Delete message', async () => {
+            try {
+              await deleteDoc(doc(msgCol(activeId), d.id));
+              if (m.file) deleteFileData(m.file).catch(() => {});
+            } catch (e) { notice(dbHint(e), 'err'); }
+          }));
+        }
+        box.append(row);
+        prev = { a: m.authorId, t };
+      }
+      if (!box.children.length) { box.append(el('div', 'text-center text-gray-500 mt-10', 'No messages yet. Say hi 👋')); return; }
+      if (stick || forceScroll) box.scrollTop = box.scrollHeight;
+      forceScroll = false;
+    }
+
+    // ---- sending text --------------------------------------------------
+    async function postMessage(pairId, data, preview) {
+      await addDoc(msgCol(pairId), { authorId: me.id, authorName: me.name, avatar: me.avatar, ...data, createdAt: serverTimestamp() });
+      if (pairId !== ROOM) updateDoc(doc(db, 'dms', pairId), { lastAt: serverTimestamp(), lastPreview: preview.slice(0, 100) }).catch(e => console.error('preview:', e));
+    }
+    $('messageForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = $('chatInput'), text = input.value.trim().slice(0, 2000);
+      if (!text || !me || !activeId) return;
+      input.value = ''; input.focus(); forceScroll = true;
+      try { await postMessage(activeId, { kind: 'text', text }, text); if (noticeSrc === 'err') notice(''); }
+      catch (err) { console.error('Send failed:', err); if (!input.value) input.value = text; notice(dbHint(err), 'err'); }
+    });
+
+    // ---- file uploads (any type, 100 MB max) --------------------------
+    function startUpload(file, pairId) {
+      if (!file.size) return notice(`"${file.name}" is empty.`, 'err');
+      if (file.size > MAX_FILE_BYTES) return notice(`"${file.name}" is ${formatBytes(file.size)}. The limit is 100 MB per file.`, 'err');
+      const type = file.type || 'application/octet-stream', name = file.name.slice(0, 200), isRoom = pairId === ROOM, total = Math.ceil(file.size / CHUNK);
+      const fileRef = doc(collection(db, 'files')), tag = { scope: isRoom ? 'room' : 'dm', members: isRoom ? [] : pairId.split('_'), owner: me.id };
+      let cancelled = false, committing = false, next = 0, sent = 0; const written = [];
+
+      const tray = $('uploadTray'), row = el('div', 'bg-pp12-chatInput rounded-lg px-3 py-2 flex items-center gap-3');
+      const mid = el('div', 'flex-1 min-w-0'), bar = el('div', 'h-full bg-pp12-brand'), pct = el('span', 'text-xs text-gray-400 w-10 text-right shrink-0', '0%');
+      const track = el('div', 'h-1.5 bg-black/30 rounded mt-1 overflow-hidden'); bar.style.width = '0%'; track.append(bar);
+      mid.append(el('div', 'text-xs text-gray-200 truncate', file.name + ' (' + formatBytes(file.size) + ')'), track);
+      const task = { cancel: () => { if (!committing) cancelled = true; } };
+      uploadTasks.add(task);
+      row.append(el('i', 'fa-solid fa-cloud-arrow-up text-gray-400'), mid, pct, iconBtn('text-gray-400 hover:text-red-400', 'fa-xmark', 'Cancel upload', () => task.cancel()));
+      tray.append(row); tray.classList.remove('hidden'); tray.classList.add('flex');
+
+      const worker = async () => {
+        try {
+          while (!cancelled && next < total) {
+            const i = next++, buf = new Uint8Array(await file.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer());
+            if (cancelled) return;
+            await setDoc(doc(fileRef, 'chunks', chunkId(i)), { ...tag, data: Bytes.fromUint8Array(buf) });
+            written.push(i); const p = Math.round(++sent / total * 100); bar.style.width = p + '%'; pct.textContent = p + '%';
+          }
+        } catch (e) { cancelled = true; throw e; }
+      };
+      (async () => {
+        let failure = null;
+        try {
+          const res = await Promise.allSettled([worker(), worker(), worker()]);
+          failure = (res.find(r => r.status === 'rejected') || {}).reason || null;
+          if (!failure && !cancelled) {
+            committing = true;
+            await setDoc(fileRef, { ...tag, name, size: file.size, type, chunks: total, createdAt: serverTimestamp() });
+            forceScroll = pairId === activeId;
+            await postMessage(pairId, { kind: 'file', file: { id: fileRef.id, name, size: file.size, type, chunks: total } }, '📎 ' + name);
+          }
+        } catch (e) { failure = e; }
+        if (cancelled || failure) {
+          await Promise.all(written.map(i => deleteDoc(doc(fileRef, 'chunks', chunkId(i))).catch(() => {})));
+          deleteDoc(fileRef).catch(() => {});
+          if (failure) notice(failure.code === 'permission-denied' ? dbHint(failure) : 'Upload failed: ' + (failure.code || failure.message), 'err');
+        }
+        uploadTasks.delete(task); row.remove();
+        if (!tray.children.length) { tray.classList.add('hidden'); tray.classList.remove('flex'); }
+      })();
+    }
+    $('attachBtn').addEventListener('click', () => $('fileInput').click());
+    $('fileInput').addEventListener('change', e => {
+      if (activeId) [...e.target.files].forEach(f => startUpload(f, activeId));
+      e.target.value = '';
+    });
+
+    // ---- emoji picker --------------------------------------------------
+    const pop = $('emojiPop'); let picker = null;
+    const closePicker = () => pop.classList.add('hidden');
+    $('emojiBtn').addEventListener('click', async e => {
+      e.stopPropagation();
+      if (!pop.classList.contains('hidden')) return closePicker();
+      if (!picker) {
+        try { await import('https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js'); }
+        catch { return notice('Could not load the emoji picker. Check your connection.', 'err'); }
+        picker = document.createElement('emoji-picker'); picker.classList.add('dark');
+        picker.addEventListener('emoji-click', ev => {
+          const input = $('chatInput'), at = input.selectionStart ?? input.value.length;
+          input.setRangeText(ev.detail.unicode, at, input.selectionEnd ?? at, 'end'); closePicker(); input.focus();
+        });
+        pop.append(picker);
+      }
+      pop.classList.remove('hidden');
+    });
+    document.addEventListener('click', e => { if (!pop.contains(e.target)) closePicker(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePicker(); closeDmModal(); } });
+
+    // ---- roles & moderation (Main Room) ---------------------------------
+    // Real enforcement is in the Firestore rules: only the owner's verified Google email can make or remove
+    // administrators. Admins manage moderators, mute, blacklist, lock and clear. Moderators can mute and delete.
+    const OWNER_EMAIL = 'cooper.davis@student.portage.k12.in.us';
+    const ROLE_META = {
+      owner: { label: '👑Owner', cls: 'text-amber-400' },
+      admin: { label: '👑Administrator', cls: 'text-amber-400' },
+      moderator: { label: '🛡️Moderator', cls: 'text-cyan-400' }
+    };
+    let rolesMap = new Map(), liveMuted = new Set(), liveBanned = new Set(), recentAuthors = new Map();
+    let myMuted = false, chatLocked = false, panelOpen = false, staffOn = false, modUnsubs = [], staffUnsubs = [];
+    const myRole = () => !me ? undefined : me.owner ? 'owner' : rolesMap.get(me.id);
+    const amAdmin = () => myRole() === 'owner' || myRole() === 'admin';
+    const amStaff = () => amAdmin() || myRole() === 'moderator';
+    const canAct = uid => { const r = rolesMap.get(uid); return r !== 'owner' && (me.owner || r !== 'admin'); };
+
+    function syncRoomUI() {
+      const inRoom = activeId === ROOM, input = $('chatInput');
+      $('manageBtn').classList.toggle('hidden', !(inRoom && amStaff()));
+      $('lockBanner').classList.toggle('hidden', !(inRoom && chatLocked));
+      const blocked = inRoom && (myMuted || (chatLocked && !amStaff()));
+      input.disabled = blocked; $('attachBtn').disabled = blocked;
+      if (inRoom) input.placeholder = myMuted ? 'You have been muted' : blocked ? 'Room is locked by an admin' : 'Message #Main Room';
+      if (!inRoom) closePanel();
+    }
+    function updateStaff() {
+      const meta = ROLE_META[myRole()], tag = $('myRoleTag');
+      tag.textContent = meta ? meta.label : '';
+      tag.className = meta ? 'text-[10px] font-bold uppercase tracking-wide ' + meta.cls : 'hidden';
+      $('userDisplayName').className = 'font-bold text-sm truncate ' + (meta ? meta.cls : 'text-white');
+      if (amStaff() && !staffOn) {
+        staffOn = true;
+        staffUnsubs = [
+          onSnapshot(collection(db, 'muted_users'), s => { liveMuted = new Set(s.docs.map(d => d.id)); if (panelOpen) renderRoster(); }, e => console.error('mute list:', e)),
+          onSnapshot(collection(db, 'banned_users'), s => { liveBanned = new Set(s.docs.map(d => d.id)); if (panelOpen) renderRoster(); }, e => console.error('ban list:', e))
+        ];
+      } else if (!amStaff() && staffOn) {
+        staffUnsubs.forEach(u => u()); staffUnsubs = []; staffOn = false; liveMuted = new Set(); liveBanned = new Set();
+      }
+      syncRoomUI();
+    }
+    function startModeration() {
+      modUnsubs = [
+        onSnapshot(collection(db, 'roles'), snap => {
+          rolesMap = new Map(snap.docs.map(d => [d.id, d.data().role]));
+          if (me.owner && rolesMap.get(me.id) !== 'owner') setDoc(doc(db, 'roles', me.id), { role: 'owner' }).catch(e => console.error('owner role:', e));
+          updateStaff(); if (lastSnap && activeId === ROOM) render(lastSnap); if (panelOpen) renderRoster();
+        }, errAt('roles')),
+        onSnapshot(doc(db, 'banned_users', me.id), s => $('bannedView').classList.toggle('hidden', !s.exists()), errAt('banned_users')),
+        onSnapshot(doc(db, 'muted_users', me.id), s => { myMuted = s.exists(); syncRoomUI(); }, errAt('muted_users')),
+        onSnapshot(doc(db, 'settings', 'chat'), s => { chatLocked = !!(s.exists() && s.data().locked); syncRoomUI(); }, errAt('settings'))
+      ];
+    }
+    function stopModeration() {
+      [...modUnsubs, ...staffUnsubs].forEach(u => u());
+      modUnsubs = []; staffUnsubs = []; staffOn = false;
+      rolesMap = new Map(); liveMuted = new Set(); liveBanned = new Set(); recentAuthors = new Map(); myMuted = chatLocked = false;
+      $('bannedView').classList.add('hidden'); closePanel();
+    }
+
+    const guarded = fn => async (...a) => { try { await fn(...a); } catch (e) { notice(dbHint(e), 'err'); } };
+    const stamp = () => ({ by: me.id, at: serverTimestamp() });
+    const setMuted = guarded((uid, on) => on ? setDoc(doc(db, 'muted_users', uid), stamp()) : deleteDoc(doc(db, 'muted_users', uid)));
+    const setBanned = guarded((uid, on) => on ? setDoc(doc(db, 'banned_users', uid), stamp()) : deleteDoc(doc(db, 'banned_users', uid)));
+    const setRole = guarded((uid, role) => role ? setDoc(doc(db, 'roles', uid), { role }) : deleteDoc(doc(db, 'roles', uid)));
+    const setLocked = guarded(on => setDoc(doc(db, 'settings', 'chat'), { locked: on }));
+    const clearAll = guarded(async () => {
+      if (!lastSnap || !lastSnap.docs.length || !confirm('Delete every message currently loaded in the Main Room? This cannot be undone.')) return;
+      await Promise.all(lastSnap.docs.map(async d => { const f = d.data().file; await deleteDoc(doc(MESSAGES, d.id)); if (f) deleteFileData(f).catch(() => {}); }));
+    });
+
+    function renderRoster() {
+      const box = $('roster'); box.replaceChildren();
+      const entries = [...recentAuthors.entries()].filter(([uid]) => uid !== me.id);
+      if (!entries.length) return box.append(el('div', 'text-xs text-gray-500 text-center py-8 px-4', 'No one else has posted in the Main Room yet. People show up here once they do.'));
+      const neutral = 'bg-pp12-chatInput hover:bg-pp12-bgTertiary text-gray-200', danger = 'bg-red-500/20 hover:bg-red-500/30 text-red-300';
+      for (const [uid, info] of entries) {
+        const role = rolesMap.get(uid), meta = ROLE_META[role], muted = liveMuted.has(uid), banned = liveBanned.has(uid), act = canAct(uid);
+        const row = el('div', 'flex items-center gap-3 p-2 rounded hover:bg-black/10');
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'rowCb rounded shrink-0'; cb.dataset.uid = uid;
+        const nameWrap = el('div', 'flex-1 min-w-0');
+        nameWrap.append(el('span', 'text-sm font-semibold truncate block ' + (meta ? meta.cls : 'text-gray-200'), info.name));
+        const tags = [meta && meta.label, muted && 'Muted', banned && 'Blacklisted'].filter(Boolean);
+        if (tags.length) nameWrap.append(el('div', 'text-[10px] text-gray-500', tags.join(' · ')));
+        const actions = el('div', 'flex flex-wrap justify-end items-center gap-1 shrink-0 max-w-[55%]');
+        const btn = (label, cls, fn) => { const b = el('button', 'text-[11px] px-2 py-1 rounded ' + cls, label); b.type = 'button'; b.addEventListener('click', fn); actions.append(b); };
+        if (act) btn(muted ? 'Unmute' : 'Mute', neutral, () => setMuted(uid, !muted));
+        if (act && amAdmin()) btn(banned ? 'Unban' : 'Blacklist', banned ? neutral : danger, () => { if (banned || confirm('Blacklist ' + info.name + ' from PP12 Chat?')) setBanned(uid, !banned); });
+        if (act && amAdmin() && role !== 'admin') btn(role === 'moderator' ? 'Remove mod' : 'Make mod', neutral, () => setRole(uid, role === 'moderator' ? null : 'moderator'));
+        if (me.owner && role !== 'owner') btn(role === 'admin' ? 'Remove admin' : 'Make admin', role === 'admin' ? danger : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300',
+          () => { if (role === 'admin' || confirm('Make ' + info.name + ' an administrator?')) setRole(uid, role === 'admin' ? null : 'admin'); });
+        row.append(cb, avatarImg(info.avatar, uid, 'w-8 h-8 rounded-full bg-gray-700 shrink-0'), nameWrap, actions);
+        box.append(row);
+      }
+    }
+    function openPanel() {
+      if (!amStaff() || activeId !== ROOM) return;
+      panelOpen = true;
+      ['adminControls', 'banSelectedBtn', 'clearChatBtn'].forEach(id => $(id).classList.toggle('hidden', !amAdmin()));
+      $('lockToggle').checked = chatLocked; renderRoster(); $('manageView').classList.remove('hidden');
+    }
+    function closePanel() { panelOpen = false; $('manageView').classList.add('hidden'); }
+    const selected = () => [...document.querySelectorAll('.rowCb:checked')].map(cb => cb.dataset.uid).filter(canAct);
+    $('manageBtn').addEventListener('click', openPanel);
+    $('manageCloseBtn').addEventListener('click', closePanel);
+    $('lockToggle').addEventListener('change', e => setLocked(e.target.checked));
+    $('muteSelectedBtn').addEventListener('click', () => selected().forEach(uid => setMuted(uid, true)));
+    $('unmuteSelectedBtn').addEventListener('click', () => selected().forEach(uid => setMuted(uid, false)));
+    $('banSelectedBtn').addEventListener('click', () => { const u = selected(); if (u.length && confirm('Blacklist ' + u.length + ' selected ' + (u.length === 1 ? 'person' : 'people') + '?')) u.forEach(x => setBanned(x, true)); });
+    $('clearChatBtn').addEventListener('click', clearAll);
+    $('bannedSignOutBtn').addEventListener('click', () => signOut(auth));
+
+    // ---- auth ----------------------------------------------------------
+    const AUTH_HINT = {
+      'auth/unauthorized-domain': 'This domain is not authorized. In Firebase Console open Authentication > Settings > Authorized domains and add it.',
+      'auth/popup-blocked': 'Your browser blocked the sign-in popup. Allow popups for this site and try again.',
+      'auth/operation-not-supported-in-this-environment': 'Open this page over http(s) or localhost, not as a local file.',
+      'auth/popup-closed-by-user': 'Sign-in was cancelled.', 'auth/cancelled-popup-request': 'Sign-in was cancelled.'
+    };
+    $('googleBtn').addEventListener('click', async () => {
+      const box = $('authError'); box.classList.add('hidden');
+      try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+      catch (e) { box.textContent = AUTH_HINT[e.code] || e.message; box.classList.remove('hidden'); }
+    });
+    $('logoutBtn').addEventListener('click', () => signOut(auth));
+    $('noticeRetryBtn').addEventListener('click', () => {
+      notice(''); if (!me) return;
+      const id = activeId; stopListeners(); startListeners(); if (id) openConversation(id);
+    });
+
+    onAuthStateChanged(auth, async user => {
+      stopListeners(); uploadTasks.forEach(t => t.cancel()); uploadTasks.clear(); fileCache.forEach(e => URL.revokeObjectURL(e.url)); fileCache.clear();
+      incoming = []; outgoing = []; dms = []; activeId = null; lastSnap = null; notice('');
+      $('uploadTray').replaceChildren(); $('uploadTray').classList.add('hidden');
+      $('authView').classList.toggle('hidden', !!user);
+      $('appRoot').classList.toggle('hidden', !user);
+      setBlurred(false); updateLayout(); closeDmModal();
+      if (!user) { me = null; return; }
+      me = { id: user.uid, name: (user.displayName || 'Anonymous User').slice(0, 60), avatar: safeAvatar(user.photoURL, user.uid), owner: !!user.emailVerified && (user.email || '').toLowerCase() === OWNER_EMAIL };
+      $('userDisplayName').textContent = me.name; $('userAvatar').src = me.avatar;
+      try { await setDoc(doc(db, 'users', me.id), { name: me.name, nameLower: me.name.toLowerCase(), avatar: me.avatar }); }
+      catch (e) { errAt('users')(e); }
+      if (!me || me.id !== user.uid) return;
+      startListeners(); renderSidebar(); checkFocus();
+      if (window.innerWidth >= 768) openConversation(ROOM);
+    });
+  </script>
+</body>
+</html>
